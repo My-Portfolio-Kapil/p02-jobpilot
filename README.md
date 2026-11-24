@@ -13,7 +13,7 @@ Checking job boards every day takes about an hour, and good roles still get miss
 Every day at 07:00, JobPilot:
 1. collects the last 24 hours of PM and Product Owner jobs in Germany from Adzuna,
 2. asks Gemini to score each one 0–100 against a short candidate profile, with a one-line reason,
-3. sends the top 10 to Telegram.
+3. sends only the good fits (score 60+, at most 10) to Telegram, with a count of how many ads were in German.
 
 ## Results
 First run, 24 Nov 2026:
@@ -23,8 +23,11 @@ First run, 24 Nov 2026:
 | Reliability | Digest arrives every day | First scheduled run: 25 Nov (pending) |
 | Relevance | ≥ 70% of top-5 jobs judged relevant | ❌ 1 of 5 (20%) on 24 Nov, rated by Claude against the profile, not by the user. 3 of the top 5 were German-language ads that Gemini scored 85 despite the prompt rule |
 | Cost | €0 | €0: self-hosted n8n and free tiers |
-| Volume | — | 485 results → 202 new unique jobs → top 10 sent |
+| Volume | — | 485 results → 202 new unique jobs → 4 good fits sent |
 | Scoring coverage | — | 200 of 202 jobs scored (2 dropped by the model) |
+
+## Key finding
+**The bottleneck wasn't the AI scoring but the language of the market.** In the first run, 3 of the top 5 jobs were German-language ads that Gemini scored 85, despite a prompt rule capping them at 50. Enforcing the cap in code fixed the ranking, and showed that 189 of 202 PM ads (94%) are written in German, often behind an English job title. For a candidate with A2 German, only about 10–15 ads a day are realistic. So the digest now shows only good fits instead of always filling 10 slots: a short list you can trust beats a long one you have to re-check.
 
 ## How it works
 ```mermaid
@@ -34,12 +37,12 @@ flowchart LR
   C --> D[Keep last 24 h]
   D --> E[Gemini scoring<br/>20 jobs per call]
   P[profile.md] --> E
-  E --> F[Top 10] --> G[Telegram]
+  E --> F[Good fits 60+] --> G[Telegram]
 ```
 
 - **n8n in Docker** runs the whole pipeline: no app server, no code to deploy. The workflow is in [`workflows/jobpilot.json`](workflows/jobpilot.json).
 - **Adzuna** returns ~485 results a day for "product manager", "produktmanager" and "product owner". About a third are the same job posted in several cities; they're merged on a normalised title + company.
-- **Gemini** (`gemini-3.1-flash-lite`) scores 20 jobs per call, about 11 calls a day. The prompt has a scoring guide and hard caps: non-PM roles at most 30, German-language ads at most 50 (the candidate speaks German at A2).
+- **Gemini** (`gemini-3.1-flash-lite`) scores 20 jobs per call, about 11 calls a day. The prompt has a scoring guide and caps non-PM roles at 30. German-language ads are capped at 50 in code (a stopword count), because Gemini ignored that rule in the prompt.
 - **The candidate profile** is a short Markdown file kept out of the repo. Only an empty template, [`profile.example.md`](profile.example.md), is public.
 
 ## Key product decisions
@@ -47,7 +50,8 @@ flowchart LR
 - [ADR-002: A 24-hour window instead of a "seen before" memory](docs/decisions/ADR-002-new-job-window.md): stateless and simple, at the cost of missing late listings or a skipped day.
 
 ## Limitations & what's next
-- **Short descriptions:** Adzuna cuts descriptions to ~500 characters, so language requirements are sometimes guessed. One German-titled role still scored 85 in the first run.
+- **Short descriptions:** Adzuna cuts descriptions to ~500 characters, so Gemini judges seniority and domain from a teaser.
+- **German detection is a heuristic:** a stopword count, so a mixed-language ad can be misclassified. The cap is one constant (`GERMAN_MAX`) to raise as the candidate's German improves.
 - **Runs on a laptop:** if the Mac is asleep at 07:00, that day's digest is skipped and its jobs are lost (ADR-002).
 - **No message on an empty day:** if no new jobs come in, nothing is sent, which looks like a failure.
 - **Next (issue #8):** more sources (LinkedIn job-alert emails, Arbeitnow) and feedback buttons in Telegram to collect relevance ratings automatically.

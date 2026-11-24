@@ -249,7 +249,7 @@
     },
     {
       "id": "a1000000-0000-4000-8000-000000000030",
-      "name": "Top 10 digest",
+      "name": "Good fits digest",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -257,7 +257,7 @@
         100
       ],
       "parameters": {
-        "jsCode": "const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst jobs = $input.all().map(i => i.json).filter(j => typeof j.score === 'number');\nconst top = jobs.sort((a, b) => b.score - a.score).slice(0, 10);\nconst strong = jobs.filter(j => j.score >= 80).length;\nconst date = new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Berlin' });\n\nconst lines = top.map((j, n) =>\n  `${n + 1}. <b>${j.score}</b> · <a href=\"${esc(j.url)}\">${esc(j.title)}</a>\\n` +\n  `${esc(j.company)} · ${esc(j.location)}${j.german ? ' · 🇩🇪 German ad' : ''}\\n<i>${esc(j.reason)}</i>`);\n\nconst text = `<b>JobPilot · ${date}</b>\\n${jobs.length} new PM jobs · ${strong} strong fits (80+)\\n\\n${lines.join('\\n\\n')}`;\nreturn [{ json: { text } }];"
+        "jsCode": "// Show only good fits; padding with weak jobs hides the good ones\nconst MIN_SCORE = 60;\nconst esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst jobs = $input.all().map(i => i.json);\nconst german = jobs.filter(j => j.german).length;\nconst good = jobs\n  .filter(j => typeof j.score === 'number' && j.score >= MIN_SCORE)\n  .sort((a, b) => b.score - a.score)\n  .slice(0, 10);\nconst date = new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Berlin' });\n\nconst lines = good.map((j, n) =>\n  `${n + 1}. <b>${j.score}</b> · <a href=\"${esc(j.url)}\">${esc(j.title)}</a>\\n` +\n  `${esc(j.company)} · ${esc(j.location)}${j.german ? ' · 🇩🇪 German ad' : ''}\\n<i>${esc(j.reason)}</i>`);\n\nconst header = `<b>JobPilot · ${date}</b>\\n${jobs.length} new PM jobs · <b>${good.length} good fits</b> (${MIN_SCORE}+) · ${german} in German`;\nconst body = good.length ? lines.join('\\n\\n') : 'No good fits today.';\nreturn [{ json: { text: `${header}\\n\\n${body}` } }];"
       }
     },
     {
@@ -423,14 +423,14 @@
       "main": [
         [
           {
-            "node": "Top 10 digest",
+            "node": "Good fits digest",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Top 10 digest": {
+    "Good fits digest": {
       "main": [
         [
           {
