@@ -21,7 +21,7 @@ First run, 24 Nov 2026:
 | Metric | Target | Result |
 |---|---|---|
 | Reliability | Digest arrives every day | First scheduled run: 25 Nov (pending) |
-| Relevance | ≥ 70% of top-5 jobs judged relevant | Pending: rating the top 5 each day |
+| Relevance | ≥ 70% of top-5 jobs judged relevant | ❌ 1 of 5 (20%) on 24 Nov, rated by Claude against the profile, not by the user. 3 of the top 5 were German-language ads that Gemini scored 85 despite the prompt rule |
 | Cost | €0 | €0: self-hosted n8n and free tiers |
 | Volume | — | 485 results → 202 new unique jobs → top 10 sent |
 | Scoring coverage | — | 200 of 202 jobs scored (2 dropped by the model) |
