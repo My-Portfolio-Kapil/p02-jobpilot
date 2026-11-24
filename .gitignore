@@ -6,3 +6,8 @@ __pycache__/
 node_modules/
 data/raw/
 *.ipynb_checkpoints
+
+# Personal CV, never commit
+*CV*.pdf
+cv.*
+profile.md

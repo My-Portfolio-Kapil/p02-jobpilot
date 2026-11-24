@@ -10,6 +10,8 @@ services:
       - TZ=Europe/Berlin
     volumes:
       - n8n_data:/home/node/.n8n
+      # Candidate profile for fit scoring; local only, see profile.example.md
+      - ./profile.md:/home/node/.n8n-files/profile.md:ro
 
 volumes:
   n8n_data:
