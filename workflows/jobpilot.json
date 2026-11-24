@@ -1,0 +1,238 @@
+{
+  "id": "JobPilotMain0001",
+  "name": "JobPilot",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Berlin"
+  },
+  "nodes": [
+    {
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Daily 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Run manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Search terms",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Adzuna returns at most 50 jobs per page; 5 pages covers a normal day per term\nconst terms = ['product manager', 'produktmanager', 'product owner'];\nconst pages = [1, 2, 3, 4, 5];\nreturn terms.flatMap(term => pages.map(page => ({ json: { term, page } })));"
+      }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Search Adzuna (last 24 h)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        100
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "AdzunaApiCred001",
+          "name": "Adzuna API"
+        }
+      },
+      "parameters": {
+        "url": "=https://api.adzuna.com/v1/api/jobs/de/search/{{ $json.page }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "what_phrase",
+              "value": "={{ $json.term }}"
+            },
+            {
+              "name": "max_days_old",
+              "value": "1"
+            },
+            {
+              "name": "results_per_page",
+              "value": "50"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1000
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "One item per job",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "fieldToSplitOut": "results",
+        "options": {}
+      }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000009",
+      "name": "Shape job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        100
+      ],
+      "parameters": {
+        "jsCode": "return $input.all().map(({ json: j }) => ({\n  json: {\n    id: j.id,\n    title: j.title,\n    company: j.company?.display_name ?? '',\n    location: j.location?.display_name ?? '',\n    contract: j.contract_time,\n    published: j.created,\n    url: j.redirect_url,\n    description: j.description,\n  },\n}));"
+      }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000006",
+      "name": "Same job from several terms or cities",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        100
+      ],
+      "parameters": {
+        "compare": "selectedFields",
+        "fieldsToCompare": "title,company",
+        "options": {}
+      }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "Only jobs from the last 24 h",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Runs once a day, so a 24 h window shows each job exactly once without storing state\nconst since = Date.now() - 24 * 60 * 60 * 1000;\nreturn $input.all().filter(i => Date.parse(i.json.published) > since);"
+      }
+    }
+  ],
+  "connections": {
+    "Daily 07:00": {
+      "main": [
+        [
+          {
+            "node": "Search terms",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run manually": {
+      "main": [
+        [
+          {
+            "node": "Search terms",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search terms": {
+      "main": [
+        [
+          {
+            "node": "Search Adzuna (last 24 h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Adzuna (last 24 h)": {
+      "main": [
+        [
+          {
+            "node": "One item per job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One item per job": {
+      "main": [
+        [
+          {
+            "node": "Shape job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Same job from several terms or cities": {
+      "main": [
+        [
+          {
+            "node": "Only jobs from the last 24 h",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape job": {
+      "main": [
+        [
+          {
+            "node": "Same job from several terms or cities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
